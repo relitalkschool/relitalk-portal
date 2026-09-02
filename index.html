@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relitalk — Портал</title>
+<style>
+  :root{
+    --bg:#F7F3F5; --surface:#FFFFFF; --ink:#170A10; --muted:#7A6570; --faint:#A896A0;
+    --hair:#ECE2E7; --pink:#FF015A; --pink-soft:#FFD9E5; --purple:#6B04EC; --amber:#E8A200;
+    --good:#12936A; --crit:#E23A46; --radius:16px;
+    --shadow:0 1px 2px rgba(23,10,16,.05), 0 8px 24px -12px rgba(23,10,16,.14);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#120A0F; --surface:#1E1017; --ink:#F6ECF1; --muted:#AE93A0; --faint:#7E6673;
+      --hair:#33222B; --pink:#FF2E77; --pink-soft:#3A1220; --purple:#A366FF;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 32px -14px rgba(0,0,0,.6); }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px 64px}
+  a{color:inherit}
+  .hidden{display:none!important}
+
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:40px;height:40px;border-radius:12px;background:var(--pink);position:relative;flex:none;box-shadow:var(--shadow)}
+  .logo::before{content:"";position:absolute;left:12px;top:10px;width:5px;height:5px;border-radius:50%;background:var(--amber)}
+  .logo::after{content:"R";position:absolute;right:9px;bottom:4px;font-weight:800;font-size:17px;color:#fff}
+  h1{font-size:20px;margin:0;letter-spacing:-.02em;font-weight:750}
+  .who{font-size:12.5px;color:var(--muted)}
+  .who b{color:var(--ink)}
+  .btn{font:inherit;font-size:13.5px;font-weight:650;cursor:pointer;border:1px solid var(--hair);background:var(--surface);color:var(--ink);padding:9px 15px;border-radius:11px}
+  .btn:hover{border-color:var(--pink)}
+  .btn.primary{background:var(--pink);color:#fff;border-color:transparent}
+  .btn.primary:hover{opacity:.92}
+  .btn.ghost{background:none}
+
+  /* login */
+  .center{min-height:70vh;display:flex;align-items:center;justify-content:center}
+  .card{background:var(--surface);border:1px solid var(--hair);border-radius:var(--radius);box-shadow:var(--shadow);padding:34px}
+  .login{max-width:400px;text-align:center}
+  .login h2{margin:14px 0 6px;font-size:22px;letter-spacing:-.02em}
+  .login p{color:var(--muted);font-size:14px;margin:0 0 22px}
+  .glogin{display:inline-flex;align-items:center;gap:10px;font-size:15px;font-weight:650;padding:12px 20px;border-radius:12px;
+    background:var(--pink);color:#fff;border:none;cursor:pointer;box-shadow:var(--shadow)}
+  .glogin:hover{opacity:.92}
+  .glogin svg{width:20px;height:20px;background:#fff;border-radius:4px;padding:2px}
+
+  /* hub */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+  .tile{display:block;text-decoration:none;background:var(--surface);border:1px solid var(--hair);border-radius:var(--radius);
+    padding:20px;box-shadow:var(--shadow);transition:transform .12s,border-color .12s}
+  .tile:hover{transform:translateY(-2px);border-color:var(--pink)}
+  .tile .ic{width:46px;height:46px;border-radius:12px;background:var(--pink-soft);display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:14px}
+  .tile h3{margin:0 0 4px;font-size:16px;letter-spacing:-.01em}
+  .tile p{margin:0;color:var(--muted);font-size:12.5px}
+  .tile .soon{display:inline-block;margin-top:10px;font-size:11px;color:var(--amber);font-weight:650}
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:650;margin:6px 2px 12px}
+
+  .banner{background:var(--surface);border:1px solid var(--hair);border-left:4px solid var(--amber);border-radius:var(--radius);
+    padding:16px 18px;box-shadow:var(--shadow);margin-bottom:8px}
+  .banner b{color:var(--ink)}
+
+  /* admin */
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--hair);white-space:nowrap}
+  th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+  select{font:inherit;font-size:13px;padding:6px 10px;border-radius:9px;border:1px solid var(--hair);background:var(--surface);color:var(--ink)}
+  .pill{font-size:11px;font-weight:650;padding:2px 9px;border-radius:999px;background:var(--pink-soft);color:var(--pink)}
+  .msg{font-size:13px;color:var(--muted);margin-top:12px}
+  .err{color:var(--crit)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Relitalk — Портал</h1>
+        <div class="who" id="who"></div>
+      </div>
+    </div>
+    <div id="headActions"></div>
+  </header>
+
+  <!-- Экран загрузки -->
+  <div id="viewLoading" class="center"><div class="muted">Загрузка…</div></div>
+
+  <!-- Экран входа -->
+  <div id="viewLogin" class="center hidden">
+    <div class="card login">
+      <div class="logo" style="margin:0 auto"></div>
+      <h2>Вход в портал</h2>
+      <p>Доступ только для сотрудников Relitalk. Войдите рабочим Google-аккаунтом.</p>
+      <button class="glogin" id="googleBtn">
+        <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.3 13.2 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.5 3-2.2 5.5-4.7 7.2l7.3 5.7c4.3-3.9 6.7-9.7 6.7-16.4z"/><path fill="#FBBC05" d="M10.5 28.3c-.5-1.4-.8-2.9-.8-4.3s.3-3 .8-4.3l-7.9-6.1C1 16.7 0 20.2 0 24s1 7.3 2.6 10.4l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.3-5.7c-2 1.4-4.7 2.3-8.6 2.3-6.4 0-11.7-3.7-13.5-9l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+        Войти через Google
+      </button>
+      <div class="msg err" id="loginErr"></div>
+    </div>
+  </div>
+
+  <!-- Ожидание доступа -->
+  <div id="viewPending" class="center hidden">
+    <div class="card login">
+      <div style="font-size:40px">⏳</div>
+      <h2>Ждём доступ</h2>
+      <p>Вы вошли, но роль ещё не назначена. Владелец выдаст доступ — тогда появятся ваши модули.</p>
+      <button class="btn" id="pendingRefresh">Проверить снова</button>
+    </div>
+  </div>
+
+  <!-- Хаб модулей -->
+  <div id="viewHub" class="hidden">
+    <div class="section-title">Ваши модули</div>
+    <div class="grid" id="moduleGrid"></div>
+  </div>
+
+  <!-- Админка -->
+  <div id="viewAdmin" class="hidden">
+    <div class="banner">Назначайте роли по email. Пользователь появляется в списке <b>после первого входа</b> через Google.</div>
+    <div class="card" style="margin-top:14px;padding:0;overflow-x:auto">
+      <table>
+        <thead><tr><th>Сотрудник</th><th>Email</th><th>Роль</th><th></th></tr></thead>
+        <tbody id="adminRows"></tbody>
+      </table>
+    </div>
+    <div class="msg" id="adminMsg"></div>
+  </div>
+
+  <div id="configWarn" class="banner hidden" style="border-left-color:var(--crit);margin-top:20px">
+    ⚠️ Не заданы ключи Supabase. Открой <b>index.html</b>, впиши <b>SUPABASE_URL</b> и <b>SUPABASE_ANON_KEY</b> в блок CONFIG (см. SETUP.md).
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ================== НАСТРОЙКА (заполнить после создания проекта Supabase) ==================
+const CONFIG = {
+  SUPABASE_URL: "https://jykvdixkgzleknhhplvt.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5a3ZkaXhrZ3psZWtuaGhwbHZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNDQxMjksImV4cCI6MjEwMzkyMDEyOX0.QW6NFVv2oqarUPN_qnnqSc_qlFvFWeKnPO-vZUVAhAo"
+};
+
+// Модули портала. roles — кому видно (owner видит всё автоматически).
+// type:'internal' — наш модуль; type:'link' — внешний инструмент по url.
+const MODULES = [
+  {id:"finance",   name:"Финансы",              icon:"💰", desc:"ОПиУ, ДДС, Kaspi, зарплаты", roles:["finance"], type:"link", url:"https://claude.ai/code/artifact/29521417-2e5c-42fc-8664-b2a010073d08"},
+  {id:"marketing", name:"Маркетинг",            icon:"📣", desc:"Реклама, креативы, лиды",    roles:["marketing"], type:"link", url:""},
+  {id:"sales",     name:"Продажи",              icon:"📞", desc:"Диагносты, РОП, планы",      roles:["sales"], type:"link", url:""},
+  {id:"education", name:"Учебная часть",        icon:"🎓", desc:"Кураторы, прогресс учеников",roles:["education"], type:"link", url:""},
+  {id:"refund",    name:"Калькулятор возврата", icon:"🧮", desc:"Расчёт суммы возврата",      roles:["sales","education"], type:"link", url:"https://relitalkschool.github.io/relitalk-refund/"}
+];
+
+const ROLE_LABELS = {owner:"Владелец",finance:"Финансы",marketing:"Маркетинг",sales:"Продажи",education:"Учебная часть",viewer:"Наблюдатель",pending:"Ожидает"};
+const ROLE_OPTIONS = ["pending","owner","finance","marketing","sales","education","viewer"];
+
+const $ = id => document.getElementById(id);
+function show(view){ ["viewLoading","viewLogin","viewPending","viewHub","viewAdmin"].forEach(v=>$(v).classList.toggle("hidden", v!==view)); }
+
+let sb = null, ME = null;
+
+function configured(){ return CONFIG.SUPABASE_URL && !CONFIG.SUPABASE_URL.includes("ВСТАВЬ") && CONFIG.SUPABASE_ANON_KEY && !CONFIG.SUPABASE_ANON_KEY.includes("ВСТАВЬ"); }
+
+async function init(){
+  if(!configured()){ show("viewLogin"); $("configWarn").classList.remove("hidden"); $("googleBtn").disabled=true; return; }
+  sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange((_e,_s)=> route());
+  await route();
+}
+
+async function route(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ show("viewLogin"); renderHead(null); return; }
+  // получить профиль/роль
+  const { data:profile, error } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
+  ME = profile || { email: session.user.email, role:"pending", full_name:"" };
+  renderHead(session.user);
+  if(!profile || ME.role==="pending"){ show("viewPending"); return; }
+  renderHub();
+  show("viewHub");
+}
+
+function renderHead(user){
+  if(!user){ $("who").textContent=""; $("headActions").innerHTML=""; return; }
+  $("who").innerHTML = `<b>${ME.full_name||user.email}</b> · ${ROLE_LABELS[ME.role]||ME.role}`;
+  let html = "";
+  if(ME.role==="owner"){
+    html += `<button class="btn ghost" id="navHub">Модули</button> <button class="btn ghost" id="navAdmin">Управление</button> `;
+  }
+  html += `<button class="btn" id="logoutBtn">Выйти</button>`;
+  $("headActions").innerHTML = html;
+  $("logoutBtn").onclick = async ()=>{ await sb.auth.signOut(); location.reload(); };
+  if(ME.role==="owner"){
+    $("navHub").onclick = ()=>{ renderHub(); show("viewHub"); };
+    $("navAdmin").onclick = ()=>{ renderAdmin(); show("viewAdmin"); };
+  }
+}
+
+function visibleModules(){
+  if(ME.role==="owner") return MODULES;
+  return MODULES.filter(m => m.roles.includes(ME.role));
+}
+function renderHub(){
+  const mods = visibleModules();
+  $("moduleGrid").innerHTML = mods.map(m=>{
+    const ready = m.url && m.url.length>0;
+    const inner = `<div class="ic">${m.icon}</div><h3>${m.name}</h3><p>${m.desc}</p>${ready?"":'<span class="soon">скоро — ссылка не задана</span>'}`;
+    return ready
+      ? `<a class="tile" href="${m.url}" target="_blank" rel="noopener">${inner}</a>`
+      : `<div class="tile" style="opacity:.7;cursor:default">${inner}</div>`;
+  }).join("") || `<div class="muted">Пока нет доступных модулей.</div>`;
+}
+
+async function renderAdmin(){
+  $("adminMsg").textContent = "Загрузка…";
+  const { data, error } = await sb.from("profiles").select("*").order("created_at");
+  if(error){ $("adminMsg").innerHTML = `<span class="err">Ошибка: ${error.message}</span>`; return; }
+  $("adminRows").innerHTML = (data||[]).map(p=>{
+    const opts = ROLE_OPTIONS.map(r=>`<option value="${r}" ${r===p.role?"selected":""}>${ROLE_LABELS[r]}</option>`).join("");
+    return `<tr>
+      <td>${p.full_name||"—"} ${p.role==="owner"?'<span class="pill">владелец</span>':""}</td>
+      <td>${p.email||"—"}</td>
+      <td><select data-uid="${p.id}">${opts}</select></td>
+      <td></td>
+    </tr>`;
+  }).join("");
+  $("adminMsg").textContent = "";
+  $("adminRows").querySelectorAll("select").forEach(sel=>{
+    sel.addEventListener("change", async ()=>{
+      const uid = sel.dataset.uid, role = sel.value;
+      sel.disabled = true; $("adminMsg").textContent = "Сохраняю…";
+      const { error } = await sb.from("profiles").update({ role }).eq("id", uid);
+      sel.disabled = false;
+      $("adminMsg").innerHTML = error ? `<span class="err">Ошибка: ${error.message}</span>` : "Сохранено ✓";
+    });
+  });
+}
+
+// wiring
+document.addEventListener("DOMContentLoaded", ()=>{
+  $("googleBtn").onclick = ()=> sb && sb.auth.signInWithOAuth({ provider:"google", options:{ redirectTo: location.href.split("#")[0] } });
+  $("pendingRefresh").onclick = ()=> route();
+  init();
+});
+</script>
+</body>
+</html>
