@@ -119,6 +119,23 @@
     <div class="grid" id="moduleGrid"></div>
   </div>
 
+  <!-- Лиды с теста -->
+  <div id="viewLeads" class="hidden">
+    <button class="btn ghost" id="leadsBack">← Модули</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 12px">
+      <div class="section-title" style="margin:0">🎯 Лиды с теста уровня <span id="leadsCount" style="color:var(--muted);font-weight:500"></span></div>
+      <input id="leadsSearch" placeholder="Поиск: имя, телефон, уровень"
+        style="font:inherit;font-size:13px;padding:9px 13px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);color:var(--ink);min-width:240px">
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto">
+      <table>
+        <thead><tr><th>Дата</th><th>Имя</th><th>Телефон</th><th>Уровень</th><th>Баллы</th><th>Цель</th></tr></thead>
+        <tbody id="leadsRows"></tbody>
+      </table>
+    </div>
+    <div class="msg" id="leadsMsg"></div>
+  </div>
+
   <!-- Админка -->
   <div id="viewAdmin" class="hidden">
     <div class="banner">Назначайте роли по email. Пользователь появляется в списке <b>после первого входа</b> через Google.</div>
@@ -147,6 +164,7 @@ const CONFIG = {
 // Модули портала. roles — кому видно (owner видит всё автоматически).
 // type:'internal' — наш модуль; type:'link' — внешний инструмент по url.
 const MODULES = [
+  {id:"leads",     name:"Лиды с теста",         icon:"🎯", desc:"Кто прошёл тест уровня",      roles:["commercial","head_sales","sales_manager","marketer"], type:"internal"},
   {id:"finance",   name:"Финансы (ОПиУ)",       icon:"💰", desc:"ОПиУ, ДДС, Kaspi",           roles:["commercial","finance"], type:"link", url:"https://claude.ai/code/artifact/29521417-2e5c-42fc-8664-b2a010073d08"},
   {id:"sales",     name:"Продажи — дашборд",    icon:"📞", desc:"Планы, конверсии, продажи",  roles:["commercial","head_sales","sales_manager"], type:"link", url:""},
   {id:"marketing", name:"Маркетинг",            icon:"📣", desc:"Реклама, креативы, лиды",     roles:["commercial","marketer"], type:"link", url:""},
@@ -166,7 +184,7 @@ const ROLE_LABELS = {
 const ROLE_OPTIONS = ["pending","owner","commercial","head_sales","sales_manager","edu_manager","lawyer","marketer","finance"];
 
 const $ = id => document.getElementById(id);
-function show(view){ ["viewLoading","viewLogin","viewPending","viewHub","viewAdmin"].forEach(v=>$(v).classList.toggle("hidden", v!==view)); }
+function show(view){ ["viewLoading","viewLogin","viewPending","viewHub","viewAdmin","viewLeads"].forEach(v=>$(v).classList.toggle("hidden", v!==view)); }
 
 let sb = null, ME = null;
 
@@ -214,12 +232,45 @@ function visibleModules(){
 function renderHub(){
   const mods = visibleModules();
   $("moduleGrid").innerHTML = mods.map(m=>{
+    const inner = `<div class="ic">${m.icon}</div><h3>${m.name}</h3><p>${m.desc}</p>`;
+    if(m.type==="internal") return `<a class="tile" href="#" data-module="${m.id}">${inner}</a>`;
     const ready = m.url && m.url.length>0;
-    const inner = `<div class="ic">${m.icon}</div><h3>${m.name}</h3><p>${m.desc}</p>${ready?"":'<span class="soon">скоро — ссылка не задана</span>'}`;
     return ready
       ? `<a class="tile" href="${m.url}">${inner}</a>`
-      : `<div class="tile" style="opacity:.7;cursor:default">${inner}</div>`;
+      : `<div class="tile" style="opacity:.7;cursor:default">${inner}<span class="soon">скоро — ссылка не задана</span></div>`;
   }).join("") || `<div class="muted">Пока нет доступных модулей.</div>`;
+  $("moduleGrid").querySelectorAll("[data-module]").forEach(el=>{
+    el.addEventListener("click", e=>{ e.preventDefault(); if(el.dataset.module==="leads") showLeads(); });
+  });
+}
+
+// ---- Лиды с теста ----
+let LEADS = [];
+function esc(s){ return String(s==null?"":s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function fmtDate(iso){ if(!iso) return ""; const d=new Date(iso);
+  return d.toLocaleDateString("ru-RU")+" "+d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}); }
+async function showLeads(){
+  show("viewLeads");
+  $("leadsMsg").textContent="Загрузка…"; $("leadsRows").innerHTML=""; $("leadsCount").textContent="";
+  const { data, error } = await sb.from("test_results").select("*").order("created_at",{ascending:false}).limit(2000);
+  if(error){ $("leadsMsg").innerHTML=`<span class="err">Ошибка: ${error.message}</span>`; return; }
+  LEADS = data || [];
+  $("leadsSearch").value="";
+  renderLeads("");
+  $("leadsMsg").textContent = LEADS.length ? "" : "Пока никто не прошёл тест.";
+}
+function renderLeads(q){
+  q=(q||"").toLowerCase().trim();
+  const rows = LEADS.filter(r=> !q || ((r.name||"")+" "+(r.phone||"")+" "+(r.level||"")).toLowerCase().includes(q));
+  $("leadsCount").textContent = "· "+rows.length+" из "+LEADS.length;
+  $("leadsRows").innerHTML = rows.map(r=>`<tr>
+    <td>${fmtDate(r.created_at)}</td>
+    <td>${esc(r.name)}</td>
+    <td>${esc(r.phone)}</td>
+    <td><b>${esc(r.level)}</b></td>
+    <td>${r.score==null?"":esc(r.score)}</td>
+    <td style="white-space:normal;max-width:260px">${esc(r.goal||"")}</td>
+  </tr>`).join("");
 }
 
 async function renderAdmin(){
@@ -251,6 +302,8 @@ async function renderAdmin(){
 document.addEventListener("DOMContentLoaded", ()=>{
   $("googleBtn").onclick = ()=> sb && sb.auth.signInWithOAuth({ provider:"google", options:{ redirectTo: location.href.split("#")[0] } });
   $("pendingRefresh").onclick = ()=> route();
+  $("leadsBack").onclick = ()=>{ renderHub(); show("viewHub"); };
+  $("leadsSearch").oninput = (e)=> renderLeads(e.target.value);
   init();
 });
 </script>
