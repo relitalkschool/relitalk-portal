@@ -209,7 +209,7 @@ function renderHub(){
     const ready = m.url && m.url.length>0;
     const inner = `<div class="ic">${m.icon}</div><h3>${m.name}</h3><p>${m.desc}</p>${ready?"":'<span class="soon">скоро — ссылка не задана</span>'}`;
     return ready
-      ? `<a class="tile" href="${m.url}" target="_blank" rel="noopener">${inner}</a>`
+      ? `<a class="tile" href="${m.url}">${inner}</a>`
       : `<div class="tile" style="opacity:.7;cursor:default">${inner}</div>`;
   }).join("") || `<div class="muted">Пока нет доступных модулей.</div>`;
 }
