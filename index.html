@@ -147,15 +147,23 @@ const CONFIG = {
 // Модули портала. roles — кому видно (owner видит всё автоматически).
 // type:'internal' — наш модуль; type:'link' — внешний инструмент по url.
 const MODULES = [
-  {id:"finance",   name:"Финансы",              icon:"💰", desc:"ОПиУ, ДДС, Kaspi, зарплаты", roles:["finance"], type:"link", url:"https://claude.ai/code/artifact/29521417-2e5c-42fc-8664-b2a010073d08"},
-  {id:"marketing", name:"Маркетинг",            icon:"📣", desc:"Реклама, креативы, лиды",    roles:["marketing"], type:"link", url:""},
-  {id:"sales",     name:"Продажи",              icon:"📞", desc:"Диагносты, РОП, планы",      roles:["sales"], type:"link", url:""},
-  {id:"education", name:"Учебная часть",        icon:"🎓", desc:"Кураторы, прогресс учеников",roles:["education"], type:"link", url:""},
-  {id:"refund",    name:"Калькулятор возврата", icon:"🧮", desc:"Расчёт суммы возврата",      roles:["sales","education"], type:"link", url:"https://relitalkschool.github.io/relitalk-refund/"}
+  {id:"finance",   name:"Финансы (ОПиУ)",       icon:"💰", desc:"ОПиУ, ДДС, Kaspi",           roles:["commercial","finance"], type:"link", url:"https://claude.ai/code/artifact/29521417-2e5c-42fc-8664-b2a010073d08"},
+  {id:"sales",     name:"Продажи — дашборд",    icon:"📞", desc:"Планы, конверсии, продажи",  roles:["commercial","head_sales","sales_manager"], type:"link", url:""},
+  {id:"marketing", name:"Маркетинг",            icon:"📣", desc:"Реклама, креативы, лиды",     roles:["commercial","marketer"], type:"link", url:""},
+  {id:"education", name:"Учебная часть",        icon:"🎓", desc:"Кураторы, прогресс учеников", roles:["commercial","edu_manager"], type:"link", url:""},
+  {id:"refund",    name:"Калькулятор возврата", icon:"🧮", desc:"Расчёт суммы возврата",       roles:["commercial","head_sales","sales_manager","edu_manager","lawyer"], type:"link", url:"https://relitalkschool.github.io/relitalk-refund/"},
+  {id:"tarify",    name:"Тарифы",               icon:"💵", desc:"Пакеты и цены",               roles:["commercial","head_sales","sales_manager"], type:"link", url:"https://relitalkschool.github.io/relitalk-tarify/"},
+  {id:"test",      name:"Тест уровня",          icon:"🧩", desc:"Тест английского для пробного",roles:["commercial","head_sales","sales_manager","marketer"], type:"link", url:"https://relitalkschool.github.io/relitalk-test/"},
+  {id:"landing",   name:"Лендинг",              icon:"🖥️", desc:"Посадочная страница",         roles:["commercial","marketer"], type:"link", url:"https://relitalkschool.github.io/relitalk-landing/"},
+  {id:"salary",    name:"Зарплаты",             icon:"📊", desc:"Мотивация и выплаты",         roles:["commercial","finance","head_sales"], type:"link", url:"https://relitalkschool.github.io/salary-dashboard/"}
 ];
 
-const ROLE_LABELS = {owner:"Владелец",finance:"Финансы",marketing:"Маркетинг",sales:"Продажи",education:"Учебная часть",viewer:"Наблюдатель",pending:"Ожидает"};
-const ROLE_OPTIONS = ["pending","owner","finance","marketing","sales","education","viewer"];
+const ROLE_LABELS = {
+  owner:"Владелец", commercial:"Коммерческий директор", head_sales:"Руководитель отдела продаж",
+  sales_manager:"Менеджер по продажам", edu_manager:"Менеджер учебной части", lawyer:"Юрист",
+  marketer:"Маркетолог", finance:"Финансы", pending:"Ожидает"
+};
+const ROLE_OPTIONS = ["pending","owner","commercial","head_sales","sales_manager","edu_manager","lawyer","marketer","finance"];
 
 const $ = id => document.getElementById(id);
 function show(view){ ["viewLoading","viewLogin","viewPending","viewHub","viewAdmin"].forEach(v=>$(v).classList.toggle("hidden", v!==view)); }
