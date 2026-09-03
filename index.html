@@ -148,6 +148,30 @@
     <div class="msg" id="adminMsg"></div>
   </div>
 
+  <!-- Возвраты (CRM) -->
+  <div id="viewRefunds" class="hidden">
+    <button class="btn ghost" id="refBack">← Модули</button>
+    <div class="section-title" style="margin-top:14px">↩️ Возвраты — заявки</div>
+    <div class="kpis" id="refKpis" style="margin-bottom:14px"></div>
+    <div class="card" style="margin-bottom:14px">
+      <h3 style="margin:0 0 10px;font-size:15px">Новый возврат</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <label style="font-size:12px;color:var(--muted)">Телефон<br><input id="rfPhone" placeholder="+7 700 000 00 00" style="font:inherit;padding:9px 12px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);color:var(--ink)"></label>
+        <label style="font-size:12px;color:var(--muted)">Имя<br><input id="rfName" placeholder="Клиент" style="font:inherit;padding:9px 12px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);color:var(--ink)"></label>
+        <label style="font-size:12px;color:var(--muted)">Сумма к возврату, ₸<br><input id="rfAmount" inputmode="numeric" placeholder="0" style="font:inherit;padding:9px 12px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);color:var(--ink);width:150px"></label>
+        <button class="btn primary" id="rfAdd">＋ Добавить</button>
+        <span class="editor-hint" id="rfMsg"></span>
+      </div>
+    </div>
+    <div class="card" style="padding:12px 12px 4px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <select id="rfFilter" style="font:inherit;font-size:12.5px;padding:7px 10px;border:1px solid var(--hair);border-radius:9px;background:var(--surface);color:var(--ink)"><option value="">Все статусы</option></select>
+        <input id="rfSearch" placeholder="Поиск: имя/телефон" style="font:inherit;font-size:12.5px;padding:7px 11px;border:1px solid var(--hair);border-radius:9px;background:var(--surface);color:var(--ink);min-width:200px">
+      </div>
+      <div class="tblwrap" id="refTable"></div>
+    </div>
+  </div>
+
   <div id="configWarn" class="banner hidden" style="border-left-color:var(--crit);margin-top:20px">
     ⚠️ Не заданы ключи Supabase. Открой <b>index.html</b>, впиши <b>SUPABASE_URL</b> и <b>SUPABASE_ANON_KEY</b> в блок CONFIG (см. SETUP.md).
   </div>
@@ -165,6 +189,7 @@ const CONFIG = {
 // type:'internal' — наш модуль; type:'link' — внешний инструмент по url.
 const MODULES = [
   {id:"leads",     name:"Лиды с теста",         icon:"🎯", desc:"Кто прошёл тест уровня",      roles:["commercial","head_sales","sales_manager","marketer"], type:"internal"},
+  {id:"refcrm",    name:"Возвраты — заявки",    icon:"↩️", desc:"CRM возвратов: статусы, суммы", roles:["commercial","head_sales","edu_manager","lawyer"], type:"internal"},
   {id:"finance",   name:"Финансы (ОПиУ)",       icon:"💰", desc:"ОПиУ, ДДС, Kaspi",           roles:["commercial","finance"], type:"link", url:"https://claude.ai/code/artifact/29521417-2e5c-42fc-8664-b2a010073d08"},
   {id:"sales",     name:"Продажи — дашборд",    icon:"📞", desc:"Планы, конверсии, продажи",  roles:["commercial","head_sales","sales_manager"], type:"link", url:""},
   {id:"marketing", name:"Маркетинг",            icon:"📣", desc:"Реклама, креативы, лиды",     roles:["commercial","marketer"], type:"link", url:""},
@@ -184,7 +209,7 @@ const ROLE_LABELS = {
 const ROLE_OPTIONS = ["pending","owner","commercial","head_sales","sales_manager","edu_manager","lawyer","marketer","finance"];
 
 const $ = id => document.getElementById(id);
-function show(view){ ["viewLoading","viewLogin","viewPending","viewHub","viewAdmin","viewLeads"].forEach(v=>$(v).classList.toggle("hidden", v!==view)); }
+function show(view){ ["viewLoading","viewLogin","viewPending","viewHub","viewAdmin","viewLeads","viewRefunds"].forEach(v=>$(v).classList.toggle("hidden", v!==view)); }
 
 let sb = null, ME = null;
 
@@ -240,8 +265,106 @@ function renderHub(){
       : `<div class="tile" style="opacity:.7;cursor:default">${inner}<span class="soon">скоро — ссылка не задана</span></div>`;
   }).join("") || `<div class="muted">Пока нет доступных модулей.</div>`;
   $("moduleGrid").querySelectorAll("[data-module]").forEach(el=>{
-    el.addEventListener("click", e=>{ e.preventDefault(); if(el.dataset.module==="leads") showLeads(); });
+    el.addEventListener("click", e=>{ e.preventDefault();
+      if(el.dataset.module==="leads") showLeads();
+      else if(el.dataset.module==="refcrm") showRefunds();
+    });
   });
+}
+
+// ---- Возвраты (CRM) ----
+const RF_STATUSES = [
+  {k:"submitted",       l:"Заявление подано",     c:"var(--muted)"},
+  {k:"calculated",      l:"Расчёт сделан",         c:"var(--purple)"},
+  {k:"agreement_sent",  l:"Соглашение отправлено", c:"var(--amber)"},
+  {k:"agreement_signed",l:"Соглашение подписано",  c:"var(--pink)"},
+  {k:"refunded",        l:"Возврат сделан",        c:"var(--good)"},
+  {k:"refused",         l:"Отказ",                 c:"var(--muted)"},
+  {k:"court",           l:"Суд",                   c:"var(--crit)"},
+  {k:"closed",          l:"Закрыто",               c:"var(--faint)"}
+];
+const RF_LABEL = k => (RF_STATUSES.find(s=>s.k===k)||{l:k}).l;
+let REFUNDS = [];
+function num(n){ return (Number(n)||0).toLocaleString("ru-RU"); }
+async function showRefunds(){
+  show("viewRefunds");
+  // наполнить фильтр статусов один раз
+  const f=$("rfFilter"); if(f.options.length<=1){ RF_STATUSES.forEach(s=>{const o=document.createElement("option");o.value=s.k;o.textContent=s.l;f.appendChild(o);}); }
+  $("rfMsg").textContent="Загрузка…";
+  const { data, error } = await sb.from("refund_cases").select("*").order("created_at",{ascending:false}).limit(2000);
+  if(error){ $("rfMsg").innerHTML=`<span class="err">Ошибка: ${error.message}</span>`; return; }
+  REFUNDS = data||[]; $("rfMsg").textContent="";
+  renderRefunds();
+}
+function renderRefunds(){
+  // KPI по статусам
+  const today=new Date(); today.setHours(0,0,0,0);
+  const todayN = REFUNDS.filter(r=> new Date(r.created_at)>=today).length;
+  let sumReq=0, sumRef=0; const cnt={};
+  REFUNDS.forEach(r=>{ cnt[r.status]=(cnt[r.status]||0)+1; sumReq+=Number(r.amount_requested)||0; sumRef+=Number(r.amount_refunded)||0; });
+  let kpi = `<div class="kpi"><div class="lab">Всего заявок</div><div class="val">${REFUNDS.length}</div><div class="foot">Новых сегодня: ${todayN}</div></div>`;
+  kpi += `<div class="kpi"><div class="lab">Сумма к возврату</div><div class="val">${num(sumReq)}<small>₸</small></div><div class="foot">Выплачено: ${num(sumRef)} ₸</div></div>`;
+  const chips = RF_STATUSES.map(s=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;margin:2px 10px 2px 0"><i style="width:9px;height:9px;border-radius:3px;background:${s.c};display:inline-block"></i>${s.l}: <b>${cnt[s.k]||0}</b></span>`).join("");
+  kpi += `<div class="kpi" style="grid-column:span 2"><div class="lab">По статусам</div><div style="margin-top:8px;line-height:1.9">${chips}</div></div>`;
+  $("refKpis").innerHTML = kpi;
+  // таблица
+  const flt=$("rfFilter").value, q=($("rfSearch").value||"").toLowerCase().trim();
+  const rows = REFUNDS.filter(r=> (!flt||r.status===flt) && (!q || ((r.client_name||"")+" "+(r.phone||"")).toLowerCase().includes(q)));
+  let h='<table><thead><tr><th>Дата</th><th>Клиент</th><th>Телефон</th><th>К возврату</th><th>Выплачено</th><th>Статус</th><th>Комментарий</th></tr></thead><tbody>';
+  h += rows.map(r=>{
+    const opts = RF_STATUSES.map(s=>`<option value="${s.k}" ${s.k===r.status?"selected":""}>${s.l}</option>`).join("");
+    return `<tr data-id="${r.id}">
+      <td>${fmtDate(r.created_at)}</td>
+      <td>${esc(r.client_name)}</td>
+      <td>${esc(r.phone)}</td>
+      <td><input class="rf-amt" data-f="amount_requested" value="${r.amount_requested||0}" style="width:100px;font:inherit;text-align:right;border:1px solid var(--hair);border-radius:8px;padding:5px 8px;background:var(--surface-2);color:var(--ink)"></td>
+      <td><input class="rf-amt" data-f="amount_refunded" value="${r.amount_refunded||0}" style="width:100px;font:inherit;text-align:right;border:1px solid var(--hair);border-radius:8px;padding:5px 8px;background:var(--surface-2);color:var(--ink)"></td>
+      <td><select class="rf-status" style="font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--hair);border-radius:8px;background:var(--surface);color:var(--ink)">${opts}</select></td>
+      <td><input class="rf-comment" value="${esc(r.comment||'')}" placeholder="…" style="min-width:160px;font:inherit;border:1px solid var(--hair);border-radius:8px;padding:5px 8px;background:var(--surface-2);color:var(--ink)"></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" style="color:var(--muted);padding:14px">Нет заявок по фильтру.</td></tr>`;
+  h+="</tbody></table>";
+  $("refTable").innerHTML=h;
+  // слушатели
+  $("refTable").querySelectorAll("tr[data-id]").forEach(tr=>{
+    const id=+tr.dataset.id;
+    tr.querySelector(".rf-status").addEventListener("change",e=> rfChangeStatus(id, e.target.value));
+    tr.querySelectorAll(".rf-amt").forEach(inp=> inp.addEventListener("change",e=> rfUpdate(id, {[inp.dataset.f]: Number(String(e.target.value).replace(/[^\d.]/g,''))||0})));
+    tr.querySelector(".rf-comment").addEventListener("change",e=> rfUpdate(id, {comment: e.target.value}));
+  });
+}
+function rfCase(id){ return REFUNDS.find(r=>r.id===id); }
+async function rfUpdate(id, patch, silent){
+  patch.updated_at = new Date().toISOString();
+  const { error } = await sb.from("refund_cases").update(patch).eq("id", id);
+  const c = rfCase(id); if(c) Object.assign(c, patch);
+  if(!silent){ $("rfMsg").className="editor-hint"; $("rfMsg").textContent = error? ("Ошибка: "+error.message) : "Сохранено ✓"; }
+  return !error;
+}
+async function rfChangeStatus(id, newStatus){
+  const c = rfCase(id); if(!c) return;
+  const from=c.status;
+  await rfUpdate(id, {status:newStatus}, true);
+  // история
+  await sb.from("refund_case_events").insert({case_id:id, from_status:from, to_status:newStatus, changed_by:(ME&&ME.email)||"", note:"смена статуса"});
+  // примечание в amoCRM
+  try{
+    await fetch(CONFIG.SUPABASE_URL+"/functions/v1/refund-amo",{method:"POST",
+      headers:{"apikey":CONFIG.SUPABASE_ANON_KEY,"Authorization":"Bearer "+CONFIG.SUPABASE_ANON_KEY,"Content-Type":"application/json"},
+      body:JSON.stringify({phone:c.phone, amoLeadId:c.amo_lead_id||null, statusLabel:RF_LABEL(newStatus),
+        amountRequested:c.amount_requested, amountRefunded:c.amount_refunded, name:c.client_name, comment:c.comment})});
+  }catch(e){}
+  renderRefunds();
+  $("rfMsg").className="editor-hint"; $("rfMsg").textContent="Статус обновлён → «"+RF_LABEL(newStatus)+"» (примечание в amoCRM отправлено)";
+}
+async function rfAdd(){
+  const phone=$("rfPhone").value.trim(), name=$("rfName").value.trim(), amount=Number($("rfAmount").value.replace(/[^\d.]/g,''))||0;
+  if(!phone && !name){ $("rfMsg").className="editor-hint err"; $("rfMsg").textContent="Укажи телефон или имя"; return; }
+  const { error } = await sb.from("refund_cases").insert({phone, client_name:name, amount_requested:amount, status:"submitted", responsible:(ME&&ME.email)||""});
+  if(error){ $("rfMsg").className="editor-hint err"; $("rfMsg").textContent="Ошибка: "+error.message; return; }
+  $("rfPhone").value=""; $("rfName").value=""; $("rfAmount").value="";
+  $("rfMsg").className="editor-hint"; $("rfMsg").textContent="Добавлено ✓";
+  showRefunds();
 }
 
 // ---- Лиды с теста ----
@@ -304,6 +427,10 @@ document.addEventListener("DOMContentLoaded", ()=>{
   $("pendingRefresh").onclick = ()=> route();
   $("leadsBack").onclick = ()=>{ renderHub(); show("viewHub"); };
   $("leadsSearch").oninput = (e)=> renderLeads(e.target.value);
+  $("refBack").onclick = ()=>{ renderHub(); show("viewHub"); };
+  $("rfAdd").onclick = rfAdd;
+  $("rfFilter").onchange = renderRefunds;
+  $("rfSearch").oninput = renderRefunds;
   init();
 });
 </script>
