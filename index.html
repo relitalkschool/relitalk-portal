@@ -456,10 +456,6 @@ async function openCase(id){
     <div style="display:flex;gap:10px"><label class="fld" style="flex:1">Сумма к возврату, ₸<input id="cAmtReq" inputmode="numeric" value="${c.amount_requested||0}"></label><label class="fld" style="flex:1">Выплачено, ₸<input id="cAmtRef" inputmode="numeric" value="${c.amount_refunded||0}"></label></div>
     <label class="fld">Ответственный<input id="cResp" value="${esc(c.responsible||'')}"></label>
     <label class="fld">Комментарий<textarea id="cComment" rows="2">${esc(c.comment||'')}</textarea></label>
-    <div class="fld">💬 Первое сообщение клиенту (проверьте имя и дату, отредактируйте при необходимости)
-      <textarea id="cFirst" rows="12" style="line-height:1.5">${esc(firstContactMsg(c))}</textarea>
-      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap"><button type="button" class="btn" id="cFirstCopy">📋 Копировать</button><button type="button" class="btn" id="cFirstWa" style="background:#25D366;color:#fff;border-color:#25D366">Открыть в WhatsApp ↗</button></div>
-    </div>
     <div class="fld">Подписанное соглашение: ${docLink}<br><input type="file" id="cDocUp" accept="image/*,application/pdf" style="margin-top:6px;color:var(--muted)"></div>
 
     <div class="section-title" style="margin:18px 2px 8px;padding-top:10px;border-top:1px solid var(--hair)">📁 Досье клиента (для юриста)</div>
@@ -467,7 +463,6 @@ async function openCase(id){
     <label class="fld">Email (для сверки со сделкой в amoCRM)<input id="cEmail" type="email" value="${esc(c.email||'')}"></label>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <label class="fld" style="flex:1;min-width:150px">Дата покупки<input type="date" id="cPurchase" value="${c.purchase_date||''}"></label>
-      <label class="fld" style="flex:1;min-width:150px">Дата открытия доступа<input type="date" id="cAccess" value="${c.access_date||''}"></label>
       <label class="fld" style="flex:1;min-width:150px">Пакет<input id="cPackage" placeholder="6 / 12 / 24 мес" value="${esc(c.package||'')}"></label>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -489,13 +484,11 @@ async function openCase(id){
   $("rfModal").classList.remove("hidden");
   const close=()=>{ $("rfModal").classList.add("hidden"); $("rfModal").innerHTML=""; };
   $("cClose").onclick=close;
-  $("cFirstCopy").onclick=async ()=>{ const t=$("cFirst").value; try{ await navigator.clipboard.writeText(t); }catch(e){ $("cFirst").select(); document.execCommand&&document.execCommand("copy"); } const b=$("cFirstCopy"); const o=b.textContent; b.textContent="Скопировано ✓"; setTimeout(()=>b.textContent=o,1500); };
-  $("cFirstWa").onclick=()=>{ const num=waNumber(c.phone); const url="https://wa.me/"+(num||"")+"?text="+encodeURIComponent($("cFirst").value); window.open(url,"_blank","noopener"); };
   $("rfModal").querySelector(".modal-bg").addEventListener("click",e=>{ if(e.target.classList.contains("modal-bg")) close(); });
   $("cSave").onclick=async ()=>{
     const tv=v=> v==="yes"?true : v==="no"?false : null;
     const patch={amount_requested:Number($("cAmtReq").value.replace(/[^\d.]/g,''))||0, amount_refunded:Number($("cAmtRef").value.replace(/[^\d.]/g,''))||0, responsible:$("cResp").value, comment:$("cComment").value,
-      client_name:$("cFio").value.trim(), email:$("cEmail").value.trim(), purchase_date:$("cPurchase").value||null, access_date:$("cAccess").value||null, package:$("cPackage").value.trim(), lessons_done:$("cLessons").value.trim(),
+      client_name:$("cFio").value.trim(), email:$("cEmail").value.trim(), purchase_date:$("cPurchase").value||null, package:$("cPackage").value.trim(), lessons_done:$("cLessons").value.trim(),
       platform_activated:tv($("cActivated").value), meeting_held:tv($("cMeeting").value), dossier_notes:$("cDossier").value, dossier_ready:$("cReady").checked};
     await rfUpdate(id, patch, true);
     const newSt=$("cStatus").value;
@@ -517,7 +510,7 @@ async function openCase(id){
   };
   // сохранить введённые поля досье перед перерисовкой карточки
   const persistDossier=async ()=>{ const tv=v=> v==="yes"?true : v==="no"?false : null;
-    await rfUpdate(id,{client_name:$("cFio").value.trim(), email:$("cEmail").value.trim(), purchase_date:$("cPurchase").value||null, access_date:$("cAccess").value||null, package:$("cPackage").value.trim(),
+    await rfUpdate(id,{client_name:$("cFio").value.trim(), email:$("cEmail").value.trim(), purchase_date:$("cPurchase").value||null, package:$("cPackage").value.trim(),
       lessons_done:$("cLessons").value.trim(), platform_activated:tv($("cActivated").value), meeting_held:tv($("cMeeting").value),
       dossier_notes:$("cDossier").value, dossier_ready:$("cReady").checked, responsible:$("cResp").value, comment:$("cComment").value},true);
   };
@@ -597,23 +590,6 @@ let LEADS = [];
 function esc(s){ return String(s==null?"":s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function fmtDate(iso){ if(!iso) return ""; const d=new Date(iso);
   return d.toLocaleDateString("ru-RU")+" "+d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}); }
-function ruLong(iso){ if(!iso) return ""; const d=new Date(iso); if(isNaN(d)) return "";
-  const M=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
-  return d.getDate()+" "+M[d.getMonth()]+" "+d.getFullYear()+" г."; }
-function firstContactMsg(c){
-  const ps=String(c.client_name||"").trim().split(/\s+/).filter(Boolean);
-  const name = ps.length>=2 ? ps[1] : (ps[0]||"Здравствуйте");
-  const acc = c.access_date||c.purchase_date;
-  const accTxt = acc ? ruLong(acc) : "[дата открытия доступа]";
-  return name+", возвращаюсь с обратной связью 🙌\n\n"+
-    "Доступ был открыт "+accTxt+" — срок пользования мы считаем с этого дня, независимо от интенсивности занятий.\n\n"+
-    "Прежде чем говорить о возврате, хочу уточнить: дело в нехватке времени или в самой программе? От этого зависит, что предложить.\n\n"+
-    "❄️ Если вопрос во времени — есть заморозка: бесплатно, от 14 дней до 3 месяцев. Срок доступа сдвигается, дни заморозки не считаются использованными.\n\n"+
-    "🤝 Если формат не подходит — доступ можно переоформить на другого человека на оставшийся срок. Сбор 5 000 ₸, сумму передачи определяете сами.\n\n"+
-    "📄 Возврат — нужно заявление, официальный ответ с расчётом придёт в течение 10 календарных дней. Удерживается стоимость методической базы, установочной встречи и использованных дней доступа.\n\n"+
-    "Напишите, что ближе — разберёмся с любым вариантом 🙂";
-}
-function waNumber(phone){ let d=String(phone||"").replace(/\D/g,""); if(d.length===10) d="7"+d; if(d.length===11&&d[0]==="8") d="7"+d.slice(1); return d; }
 async function showLeads(){
   show("viewLeads");
   $("leadsMsg").textContent="Загрузка…"; $("leadsRows").innerHTML=""; $("leadsCount").textContent="";
