@@ -318,10 +318,9 @@ const RF_STATUSES = [
   {k:"calculated",      l:"Расчёт отправлен",      c:"var(--purple)"},
   {k:"agreement_sent",  l:"Соглашение отправлено", c:"var(--amber)"},
   {k:"agreement_signed",l:"Соглашение подписано",  c:"var(--pink)"},
-  {k:"refunded",        l:"Возврат сделан",        c:"var(--good)"},
+  {k:"closed",          l:"Возврат успешно получен", c:"var(--good)"},
   {k:"refused",         l:"Отказ",                 c:"var(--muted)"},
-  {k:"court",           l:"Суд",                   c:"var(--crit)"},
-  {k:"closed",          l:"Закрыто",               c:"var(--faint)"}
+  {k:"court",           l:"Суд",                   c:"var(--crit)"}
 ];
 const RF_LABEL = k => (RF_STATUSES.find(s=>s.k===k)||{l:k}).l;
 const RF_DEADLINE_DAYS = 15; // дней на возврат после подписания соглашения
@@ -500,7 +499,7 @@ async function rfChangeStatus(id, newStatus){
   const from=c.status;
   const patch={status:newStatus};
   if(newStatus==='agreement_signed'){ const now=new Date(); patch.agreement_signed_at=now.toISOString(); patch.deadline=new Date(now.getTime()+RF_DEADLINE_DAYS*86400000).toISOString(); }
-  if(newStatus==='refunded' && !c.refunded_at){ patch.refunded_at=new Date().toISOString(); }
+  if(newStatus==='closed' && !c.refunded_at){ patch.refunded_at=new Date().toISOString(); }
   await rfUpdate(id, patch, true);
   // история
   await sb.from("refund_case_events").insert({case_id:id, from_status:from, to_status:newStatus, changed_by:(ME&&ME.email)||"", note:"смена статуса"});
