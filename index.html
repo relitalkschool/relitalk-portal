@@ -85,6 +85,15 @@
   .rf-card .nm{font-weight:650;font-size:13px}
   .rf-card .ph{font-size:12px;color:var(--muted);margin-top:1px}
   .rf-card .am{font-size:12.5px;font-weight:700;color:var(--pink);margin-top:5px}
+  .rf-open{cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+  .modal-bg{position:fixed;inset:0;background:rgba(10,4,8,.5);display:flex;align-items:center;justify-content:center;z-index:60;padding:18px}
+  .modal{background:var(--surface);border:1px solid var(--hair);border-radius:16px;box-shadow:var(--shadow);max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:22px}
+  .modal h3{margin:0;font-size:18px}
+  .fld{display:block;margin:8px 0;font-size:12px;color:var(--muted)}
+  .fld input,.fld select,.fld textarea{width:100%;font:inherit;font-size:13px;padding:8px 11px;border:1px solid var(--hair);border-radius:9px;background:var(--surface-2);color:var(--ink);margin-top:3px}
+  .tl{border-left:2px solid var(--hair);margin:8px 0;padding-left:16px}
+  .tl-item{position:relative;padding:5px 0;font-size:12.5px}
+  .tl-item::before{content:"";position:absolute;left:-21px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--pink)}
 </style>
 </head>
 <body>
@@ -186,6 +195,8 @@
       <div class="tblwrap" id="refTable"></div>
     </div>
   </div>
+
+  <div id="rfModal" class="hidden"></div>
 
   <div id="configWarn" class="banner hidden" style="border-left-color:var(--crit);margin-top:20px">
     ⚠️ Не заданы ключи Supabase. Открой <b>index.html</b>, впиши <b>SUPABASE_URL</b> и <b>SUPABASE_ANON_KEY</b> в блок CONFIG (см. SETUP.md).
@@ -336,7 +347,7 @@ function renderRefundTable(){
     const opts = RF_STATUSES.map(s=>`<option value="${s.k}" ${s.k===r.status?"selected":""}>${s.l}</option>`).join("");
     return `<tr data-id="${r.id}">
       <td>${fmtDate(r.created_at)}</td>
-      <td>${esc(r.client_name)}</td>
+      <td><span class="rf-open" data-open="${r.id}">${esc(r.client_name)||'—'}</span></td>
       <td>${esc(r.phone)}</td>
       <td><input class="rf-amt" data-f="amount_requested" value="${r.amount_requested||0}" style="width:100px;font:inherit;text-align:right;border:1px solid var(--hair);border-radius:8px;padding:5px 8px;background:var(--surface-2);color:var(--ink)"></td>
       <td><input class="rf-amt" data-f="amount_refunded" value="${r.amount_refunded||0}" style="width:100px;font:inherit;text-align:right;border:1px solid var(--hair);border-radius:8px;padding:5px 8px;background:var(--surface-2);color:var(--ink)"></td>
@@ -352,6 +363,7 @@ function renderRefundTable(){
     tr.querySelectorAll(".rf-amt").forEach(inp=> inp.addEventListener("change",e=> rfUpdate(id, {[inp.dataset.f]: Number(String(e.target.value).replace(/[^\d.]/g,''))||0})));
     tr.querySelector(".rf-comment").addEventListener("change",e=> rfUpdate(id, {comment: e.target.value}));
   });
+  $("refTable").querySelectorAll(".rf-open").forEach(s=> s.addEventListener("click",()=> openCase(+s.dataset.open)));
 }
 function renderRefundBoard(){
   const q=($("rfSearch").value||"").toLowerCase().trim();
@@ -368,6 +380,7 @@ function renderRefundBoard(){
   $("refTable").innerHTML=h;
   $("refTable").querySelectorAll(".rf-card").forEach(c=>{
     c.addEventListener("dragstart",e=>{ e.dataTransfer.setData("text/plain", c.dataset.id); e.dataTransfer.effectAllowed="move"; });
+    c.addEventListener("click",()=> openCase(+c.dataset.id));
   });
   $("refTable").querySelectorAll(".rf-col").forEach(col=>{
     col.addEventListener("dragover",e=>{ e.preventDefault(); col.classList.add("drop"); });
@@ -379,6 +392,63 @@ function renderRefundBoard(){
   });
 }
 function rfCase(id){ return REFUNDS.find(r=>r.id===id); }
+async function openCase(id){
+  const c=rfCase(id); if(!c) return;
+  const AMO="https://englproject.amocrm.ru/leads/detail/";
+  const { data:events } = await sb.from("refund_case_events").select("*").eq("case_id",id).order("changed_at",{ascending:false});
+  const opts = RF_STATUSES.map(s=>`<option value="${s.k}" ${s.k===c.status?"selected":""}>${s.l}</option>`).join("");
+  const hist = (events||[]).map(e=>`<div class="tl-item"><b>${RF_LABEL(e.to_status)}</b> <span style="color:var(--muted)">← ${RF_LABEL(e.from_status)||"—"} · ${fmtDate(e.changed_at)}${e.changed_by?" · "+esc(e.changed_by):""}</span></div>`).join("") || `<div class="tl-item" style="color:var(--muted)">Пока без изменений статуса</div>`;
+  const docLink = c.doc_path ? `<a href="#" id="cDocDl">📎 Скачать документ</a>` : `<span style="color:var(--muted)">файла нет</span>`;
+  const amoBtn = c.amo_lead_id ? `<a class="btn" href="${AMO}${c.amo_lead_id}" target="_blank" rel="noopener">Открыть сделку в amoCRM ↗</a>` : `<button class="btn" id="cResolve">Найти сделку в amoCRM</button>`;
+  $("rfModal").innerHTML = `<div class="modal-bg"><div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:10px"><h3>${esc(c.client_name)||"Возврат"}</h3><button class="btn ghost" id="cClose">✕</button></div>
+    <div style="color:var(--muted);font-size:13px;margin:2px 0 14px">${esc(c.phone)||"без телефона"} · создан ${fmtDate(c.created_at)}</div>
+    <label class="fld">Статус<select id="cStatus">${opts}</select></label>
+    <div style="display:flex;gap:10px"><label class="fld" style="flex:1">Сумма к возврату, ₸<input id="cAmtReq" inputmode="numeric" value="${c.amount_requested||0}"></label><label class="fld" style="flex:1">Выплачено, ₸<input id="cAmtRef" inputmode="numeric" value="${c.amount_refunded||0}"></label></div>
+    <label class="fld">Ответственный<input id="cResp" value="${esc(c.responsible||'')}"></label>
+    <label class="fld">Комментарий<textarea id="cComment" rows="2">${esc(c.comment||'')}</textarea></label>
+    <div class="fld">Скан соглашения: ${docLink}<br><input type="file" id="cDocUp" accept="image/*,application/pdf" style="margin-top:6px;color:var(--muted)"></div>
+    <div class="section-title" style="margin:16px 2px 6px">История статусов</div>
+    <div class="tl">${hist}</div>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">${amoBtn}<button class="btn primary" id="cSave">Сохранить</button></div>
+    <div class="msg" id="cMsg"></div>
+  </div></div>`;
+  $("rfModal").classList.remove("hidden");
+  const close=()=>{ $("rfModal").classList.add("hidden"); $("rfModal").innerHTML=""; };
+  $("cClose").onclick=close;
+  $("rfModal").querySelector(".modal-bg").addEventListener("click",e=>{ if(e.target.classList.contains("modal-bg")) close(); });
+  $("cSave").onclick=async ()=>{
+    const patch={amount_requested:Number($("cAmtReq").value.replace(/[^\d.]/g,''))||0, amount_refunded:Number($("cAmtRef").value.replace(/[^\d.]/g,''))||0, responsible:$("cResp").value, comment:$("cComment").value};
+    await rfUpdate(id, patch, true);
+    const newSt=$("cStatus").value;
+    if(newSt!==c.status) await rfChangeStatus(id, newSt);
+    close(); showRefunds();
+  };
+  $("cDocUp").onchange=async (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    $("cMsg").className="msg"; $("cMsg").textContent="Загрузка файла…";
+    const path=id+"/"+Date.now()+"_"+f.name.replace(/[^\w.\-]+/g,"_");
+    const { error } = await sb.storage.from("refund-docs").upload(path, f, {upsert:true});
+    if(error){ $("cMsg").innerHTML=`<span class="err">Ошибка: ${error.message}</span>`; return; }
+    await rfUpdate(id, {doc_path:path}, true); c.doc_path=path;
+    $("cMsg").textContent="Файл загружен ✓ (обнови карточку, чтобы скачать)";
+  };
+  if($("cDocDl")) $("cDocDl").onclick=async (e)=>{ e.preventDefault();
+    const { data } = await sb.storage.from("refund-docs").createSignedUrl(c.doc_path, 300);
+    if(data&&data.signedUrl) window.open(data.signedUrl,"_blank");
+  };
+  if($("cResolve")) $("cResolve").onclick=async ()=>{
+    $("cMsg").className="msg"; $("cMsg").textContent="Ищу сделку по номеру…";
+    try{
+      const r=await fetch(CONFIG.SUPABASE_URL+"/functions/v1/refund-amo",{method:"POST",
+        headers:{"apikey":CONFIG.SUPABASE_ANON_KEY,"Authorization":"Bearer "+CONFIG.SUPABASE_ANON_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({phone:c.phone, statusLabel:RF_LABEL(c.status), amountRequested:c.amount_requested, amountRefunded:c.amount_refunded, name:c.client_name})});
+      const j=await r.json();
+      if(j.leadId){ await rfUpdate(id,{amo_lead_id:j.leadId},true); c.amo_lead_id=j.leadId; openCase(id); }
+      else $("cMsg").textContent="Сделка по этому номеру не найдена в amoCRM";
+    }catch(e){ $("cMsg").textContent="Ошибка связи"; }
+  };
+}
 async function rfUpdate(id, patch, silent){
   patch.updated_at = new Date().toISOString();
   const { error } = await sb.from("refund_cases").update(patch).eq("id", id);
@@ -392,12 +462,14 @@ async function rfChangeStatus(id, newStatus){
   await rfUpdate(id, {status:newStatus}, true);
   // история
   await sb.from("refund_case_events").insert({case_id:id, from_status:from, to_status:newStatus, changed_by:(ME&&ME.email)||"", note:"смена статуса"});
-  // примечание в amoCRM
+  // примечание + поле статуса в amoCRM
   try{
-    await fetch(CONFIG.SUPABASE_URL+"/functions/v1/refund-amo",{method:"POST",
+    const r=await fetch(CONFIG.SUPABASE_URL+"/functions/v1/refund-amo",{method:"POST",
       headers:{"apikey":CONFIG.SUPABASE_ANON_KEY,"Authorization":"Bearer "+CONFIG.SUPABASE_ANON_KEY,"Content-Type":"application/json"},
       body:JSON.stringify({phone:c.phone, amoLeadId:c.amo_lead_id||null, statusLabel:RF_LABEL(newStatus),
         amountRequested:c.amount_requested, amountRefunded:c.amount_refunded, name:c.client_name, comment:c.comment})});
+    const j=await r.json().catch(()=>({}));
+    if(j&&j.leadId&&!c.amo_lead_id){ await rfUpdate(id,{amo_lead_id:j.leadId},true); }
   }catch(e){}
   renderRefunds();
   $("rfMsg").className="editor-hint"; $("rfMsg").textContent="Статус обновлён → «"+RF_LABEL(newStatus)+"» (примечание в amoCRM отправлено)";
