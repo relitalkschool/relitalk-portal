@@ -71,6 +71,20 @@
   .pill{font-size:11px;font-weight:650;padding:2px 9px;border-radius:999px;background:var(--pink-soft);color:var(--pink)}
   .msg{font-size:13px;color:var(--muted);margin-top:12px}
   .err{color:var(--crit)}
+
+  /* Kanban возвратов */
+  .rf-toggle button{font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ink);background:var(--surface);border:1px solid var(--hair);padding:7px 12px;border-radius:9px}
+  .rf-toggle button.active{background:var(--pink);color:#fff;border-color:transparent}
+  .rf-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px}
+  .rf-col{flex:0 0 236px;background:var(--surface-2);border:1px solid var(--hair);border-radius:12px;padding:10px;min-height:120px}
+  .rf-col.drop{outline:2px dashed var(--pink);outline-offset:-2px}
+  .rf-col h4{margin:0 0 10px;font-size:12.5px;font-weight:650;display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .rf-col h4 .cnt{font-size:11px;color:var(--muted);font-weight:500}
+  .rf-card{background:var(--surface);border:1px solid var(--hair);border-radius:10px;padding:10px;margin-bottom:8px;cursor:grab;box-shadow:var(--shadow)}
+  .rf-card:active{cursor:grabbing}
+  .rf-card .nm{font-weight:650;font-size:13px}
+  .rf-card .ph{font-size:12px;color:var(--muted);margin-top:1px}
+  .rf-card .am{font-size:12.5px;font-weight:700;color:var(--pink);margin-top:5px}
 </style>
 </head>
 <body>
@@ -165,6 +179,7 @@
     </div>
     <div class="card" style="padding:12px 12px 4px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <span class="rf-toggle" style="display:inline-flex;gap:4px"><button id="rfViewBoard">Доска</button><button id="rfViewTable">Таблица</button></span>
         <select id="rfFilter" style="font:inherit;font-size:12.5px;padding:7px 10px;border:1px solid var(--hair);border-radius:9px;background:var(--surface);color:var(--ink)"><option value="">Все статусы</option></select>
         <input id="rfSearch" placeholder="Поиск: имя/телефон" style="font:inherit;font-size:12.5px;padding:7px 11px;border:1px solid var(--hair);border-radius:9px;background:var(--surface);color:var(--ink);min-width:200px">
       </div>
@@ -285,6 +300,7 @@ const RF_STATUSES = [
 ];
 const RF_LABEL = k => (RF_STATUSES.find(s=>s.k===k)||{l:k}).l;
 let REFUNDS = [];
+let RF_VIEW = "board";
 function num(n){ return (Number(n)||0).toLocaleString("ru-RU"); }
 async function showRefunds(){
   show("viewRefunds");
@@ -307,7 +323,12 @@ function renderRefunds(){
   const chips = RF_STATUSES.map(s=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;margin:2px 10px 2px 0"><i style="width:9px;height:9px;border-radius:3px;background:${s.c};display:inline-block"></i>${s.l}: <b>${cnt[s.k]||0}</b></span>`).join("");
   kpi += `<div class="kpi" style="grid-column:span 2"><div class="lab">По статусам</div><div style="margin-top:8px;line-height:1.9">${chips}</div></div>`;
   $("refKpis").innerHTML = kpi;
-  // таблица
+  $("rfViewBoard").classList.toggle("active", RF_VIEW==="board");
+  $("rfViewTable").classList.toggle("active", RF_VIEW==="table");
+  $("rfFilter").style.display = RF_VIEW==="board" ? "none" : "";
+  if(RF_VIEW==="board") renderRefundBoard(); else renderRefundTable();
+}
+function renderRefundTable(){
   const flt=$("rfFilter").value, q=($("rfSearch").value||"").toLowerCase().trim();
   const rows = REFUNDS.filter(r=> (!flt||r.status===flt) && (!q || ((r.client_name||"")+" "+(r.phone||"")).toLowerCase().includes(q)));
   let h='<table><thead><tr><th>Дата</th><th>Клиент</th><th>Телефон</th><th>К возврату</th><th>Выплачено</th><th>Статус</th><th>Комментарий</th></tr></thead><tbody>';
@@ -325,12 +346,36 @@ function renderRefunds(){
   }).join("") || `<tr><td colspan="7" style="color:var(--muted);padding:14px">Нет заявок по фильтру.</td></tr>`;
   h+="</tbody></table>";
   $("refTable").innerHTML=h;
-  // слушатели
   $("refTable").querySelectorAll("tr[data-id]").forEach(tr=>{
     const id=+tr.dataset.id;
     tr.querySelector(".rf-status").addEventListener("change",e=> rfChangeStatus(id, e.target.value));
     tr.querySelectorAll(".rf-amt").forEach(inp=> inp.addEventListener("change",e=> rfUpdate(id, {[inp.dataset.f]: Number(String(e.target.value).replace(/[^\d.]/g,''))||0})));
     tr.querySelector(".rf-comment").addEventListener("change",e=> rfUpdate(id, {comment: e.target.value}));
+  });
+}
+function renderRefundBoard(){
+  const q=($("rfSearch").value||"").toLowerCase().trim();
+  const rows = REFUNDS.filter(r=> !q || ((r.client_name||"")+" "+(r.phone||"")).toLowerCase().includes(q));
+  let h='<div class="rf-board">';
+  RF_STATUSES.forEach(s=>{
+    const list=rows.filter(r=>r.status===s.k);
+    const sum=list.reduce((a,r)=>a+(Number(r.amount_requested)||0),0);
+    h+=`<div class="rf-col" data-status="${s.k}"><h4><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${s.c};margin-right:6px"></i>${s.l}</span><span class="cnt">${list.length}${sum?" · "+num(sum)+"₸":""}</span></h4>`;
+    h+=list.map(r=>`<div class="rf-card" draggable="true" data-id="${r.id}"><div class="nm">${esc(r.client_name)||"—"}</div><div class="ph">${esc(r.phone)||""}</div>${Number(r.amount_requested)?`<div class="am">${num(r.amount_requested)} ₸</div>`:""}</div>`).join("");
+    h+=`</div>`;
+  });
+  h+='</div>';
+  $("refTable").innerHTML=h;
+  $("refTable").querySelectorAll(".rf-card").forEach(c=>{
+    c.addEventListener("dragstart",e=>{ e.dataTransfer.setData("text/plain", c.dataset.id); e.dataTransfer.effectAllowed="move"; });
+  });
+  $("refTable").querySelectorAll(".rf-col").forEach(col=>{
+    col.addEventListener("dragover",e=>{ e.preventDefault(); col.classList.add("drop"); });
+    col.addEventListener("dragleave",()=> col.classList.remove("drop"));
+    col.addEventListener("drop",e=>{ e.preventDefault(); col.classList.remove("drop");
+      const id=+e.dataTransfer.getData("text/plain"); const st=col.dataset.status; const c=rfCase(id);
+      if(c && c.status!==st) rfChangeStatus(id, st);
+    });
   });
 }
 function rfCase(id){ return REFUNDS.find(r=>r.id===id); }
@@ -431,6 +476,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
   $("rfAdd").onclick = rfAdd;
   $("rfFilter").onchange = renderRefunds;
   $("rfSearch").oninput = renderRefunds;
+  $("rfViewBoard").onclick = ()=>{ RF_VIEW="board"; renderRefunds(); };
+  $("rfViewTable").onclick = ()=>{ RF_VIEW="table"; renderRefunds(); };
   init();
 });
 </script>
