@@ -319,8 +319,8 @@ const RF_STATUSES = [
   {k:"agreement_sent",  l:"Соглашение отправлено", c:"var(--amber)"},
   {k:"agreement_signed",l:"Соглашение подписано",  c:"var(--pink)"},
   {k:"closed",          l:"Возврат успешно получен", c:"var(--good)"},
-  {k:"refused",         l:"Отказ",                 c:"var(--muted)"},
-  {k:"court",           l:"Суд",                   c:"var(--crit)"}
+  {k:"court",           l:"Суд",                   c:"var(--crit)"},
+  {k:"refused",         l:"Отработан",             c:"var(--muted)"}
 ];
 const RF_LABEL = k => (RF_STATUSES.find(s=>s.k===k)||{l:k}).l;
 const RF_DEADLINE_DAYS = 15; // дней на возврат после подписания соглашения
