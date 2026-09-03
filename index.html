@@ -99,6 +99,11 @@
   .rf-card .nm{font-weight:650;font-size:13px}
   .rf-card .ph{font-size:12px;color:var(--muted);margin-top:1px}
   .rf-card .am{font-size:12.5px;font-weight:700;color:var(--pink);margin-top:5px}
+  .rf-ready{display:inline-block;font-size:11px;font-weight:700;color:#0a7d33;background:#e5f7ec;border:1px solid #b8e6c6;border-radius:6px;padding:1px 7px;margin-top:6px}
+  .rf-file{display:flex;align-items:center;gap:8px;padding:4px 8px;background:var(--surface);border:1px solid var(--hair);border-radius:8px;margin-bottom:5px;font-size:12.5px}
+  .rf-file a{flex:1;color:var(--ink);text-decoration:none;word-break:break-all}
+  .rf-file .rf-fdel{border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px}
+  .rf-file .rf-fdel:hover{color:var(--pink)}
   .rf-open{cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
   .modal-bg{position:fixed;inset:0;background:rgba(10,4,8,.5);display:flex;align-items:center;justify-content:center;z-index:60;padding:18px}
   .modal{background:var(--surface);border:1px solid var(--hair);border-radius:16px;box-shadow:var(--shadow);max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:22px}
@@ -410,7 +415,7 @@ function renderRefundBoard(){
     const list=rows.filter(r=>r.status===s.k);
     const sum=list.reduce((a,r)=>a+(Number(r.amount_requested)||0),0);
     h+=`<div class="rf-col" data-status="${s.k}"><div class="rf-colhd"><span class="ttl"><i style="background:${s.c}"></i>${s.l}</span><span class="cnt">${list.length}</span></div>${sum?`<div class="rf-colsum">${num(sum)} ₸</div>`:''}`;
-    h+=list.map(r=>`<div class="rf-card" draggable="true" data-id="${r.id}"><div class="nm">${esc(r.client_name)||"—"}</div><div class="ph">${esc(r.phone)||""}</div>${Number(r.amount_requested)?`<div class="am">${num(r.amount_requested)} ₸</div>`:""}${rfDlText(r)}</div>`).join("");
+    h+=list.map(r=>`<div class="rf-card" draggable="true" data-id="${r.id}"><div class="nm">${esc(r.client_name)||"—"}</div><div class="ph">${esc(r.phone)||""}</div>${Number(r.amount_requested)?`<div class="am">${num(r.amount_requested)} ₸</div>`:""}${r.dossier_ready?`<div class="rf-ready">✓ досье для юриста</div>`:""}${rfDlText(r)}</div>`).join("");
     h+=`</div>`;
   });
   h+='</div>';
@@ -432,7 +437,13 @@ function rfCase(id){ return REFUNDS.find(r=>r.id===id); }
 async function openCase(id){
   const c=rfCase(id); if(!c) return;
   const AMO="https://englproject.amocrm.ru/leads/detail/";
-  const { data:events } = await sb.from("refund_case_events").select("*").eq("case_id",id).order("changed_at",{ascending:false});
+  const [{ data:events }, { data:files }] = await Promise.all([
+    sb.from("refund_case_events").select("*").eq("case_id",id).order("changed_at",{ascending:false}),
+    sb.from("refund_case_files").select("*").eq("case_id",id).order("created_at",{ascending:false})
+  ]);
+  const FILES = files||[];
+  const fileList=(kind,empty)=> FILES.filter(f=>f.kind===kind).map(f=>`<div class="rf-file"><a href="#" class="rf-fdl" data-path="${esc(f.path)}">📎 ${esc(f.name||'файл')}</a> <span style="color:var(--muted);font-size:11px">${fmtDate(f.created_at)}</span> <button class="rf-fdel" data-fid="${f.id}" data-path="${esc(f.path)}" title="Удалить файл">✕</button></div>`).join("") || `<span style="color:var(--muted);font-size:12px">${empty}</span>`;
+  const triSel=(id2,v)=>`<select id="${id2}"><option value="">—</option><option value="yes" ${v===true?"selected":""}>Да</option><option value="no" ${v===false?"selected":""}>Нет</option></select>`;
   const opts = RF_STATUSES.map(s=>`<option value="${s.k}" ${s.k===c.status?"selected":""}>${s.l}</option>`).join("");
   const hist = (events||[]).map(e=>`<div class="tl-item"><b>${RF_LABEL(e.to_status)}</b> <span style="color:var(--muted)">← ${RF_LABEL(e.from_status)||"—"} · ${fmtDate(e.changed_at)}${e.changed_by?" · "+esc(e.changed_by):""}</span></div>`).join("") || `<div class="tl-item" style="color:var(--muted)">Пока без изменений статуса</div>`;
   const docLink = c.doc_path ? `<a href="#" id="cDocDl">📎 Скачать документ</a>` : `<span style="color:var(--muted)">файла нет</span>`;
@@ -445,7 +456,25 @@ async function openCase(id){
     <div style="display:flex;gap:10px"><label class="fld" style="flex:1">Сумма к возврату, ₸<input id="cAmtReq" inputmode="numeric" value="${c.amount_requested||0}"></label><label class="fld" style="flex:1">Выплачено, ₸<input id="cAmtRef" inputmode="numeric" value="${c.amount_refunded||0}"></label></div>
     <label class="fld">Ответственный<input id="cResp" value="${esc(c.responsible||'')}"></label>
     <label class="fld">Комментарий<textarea id="cComment" rows="2">${esc(c.comment||'')}</textarea></label>
-    <div class="fld">Скан соглашения: ${docLink}<br><input type="file" id="cDocUp" accept="image/*,application/pdf" style="margin-top:6px;color:var(--muted)"></div>
+    <div class="fld">Подписанное соглашение: ${docLink}<br><input type="file" id="cDocUp" accept="image/*,application/pdf" style="margin-top:6px;color:var(--muted)"></div>
+
+    <div class="section-title" style="margin:18px 2px 8px;padding-top:10px;border-top:1px solid var(--hair)">📁 Досье клиента (для юриста)</div>
+    <label class="fld">ФИО клиента<input id="cFio" value="${esc(c.client_name||'')}"></label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <label class="fld" style="flex:1;min-width:150px">Дата покупки<input type="date" id="cPurchase" value="${c.purchase_date||''}"></label>
+      <label class="fld" style="flex:1;min-width:150px">Пакет<input id="cPackage" placeholder="6 / 12 / 24 мес" value="${esc(c.package||'')}"></label>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <label class="fld" style="flex:1;min-width:150px">Пройдено уроков<input id="cLessons" placeholder="напр. 12 из 90" value="${esc(c.lessons_done||'')}"></label>
+      <label class="fld" style="flex:1;min-width:120px">Активировал платформу${triSel('cActivated',c.platform_activated)}</label>
+      <label class="fld" style="flex:1;min-width:120px">Проведена встреча${triSel('cMeeting',c.meeting_held)}</label>
+    </div>
+    <label class="fld">Заметки для юриста (история клиента)<textarea id="cDossier" rows="3" placeholder="Кратко: когда и что купил, как шёл, были ли обращения, суть претензии…">${esc(c.dossier_notes||'')}</textarea></label>
+    <div class="fld">Заявление на возврат<div style="margin:4px 0 6px">${fileList('application','заявление не прикреплено')}</div><input type="file" class="rf-fup" data-kind="application" accept="image/*,application/pdf" style="color:var(--muted)"></div>
+    <div class="fld">Скриншоты (переписка, оплата, активность в приложении)<div style="margin:4px 0 6px">${fileList('screenshot','скриншотов нет')}</div><input type="file" class="rf-fup" data-kind="screenshot" accept="image/*,application/pdf" multiple style="color:var(--muted)"></div>
+    <div class="fld">Прочие документы<div style="margin:4px 0 6px">${fileList('other','нет')}</div><input type="file" class="rf-fup" data-kind="other" accept="image/*,application/pdf" multiple style="color:var(--muted)"></div>
+    <label style="display:flex;align-items:center;gap:8px;margin:8px 2px;font-weight:600;cursor:pointer"><input type="checkbox" id="cReady" ${c.dossier_ready?"checked":""}> Досье готово — можно передавать юристу</label>
+
     <div class="section-title" style="margin:16px 2px 6px">История статусов</div>
     <div class="tl">${hist}</div>
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">${amoBtn}<button class="btn primary" id="cSave">Сохранить</button></div>
@@ -456,7 +485,10 @@ async function openCase(id){
   $("cClose").onclick=close;
   $("rfModal").querySelector(".modal-bg").addEventListener("click",e=>{ if(e.target.classList.contains("modal-bg")) close(); });
   $("cSave").onclick=async ()=>{
-    const patch={amount_requested:Number($("cAmtReq").value.replace(/[^\d.]/g,''))||0, amount_refunded:Number($("cAmtRef").value.replace(/[^\d.]/g,''))||0, responsible:$("cResp").value, comment:$("cComment").value};
+    const tv=v=> v==="yes"?true : v==="no"?false : null;
+    const patch={amount_requested:Number($("cAmtReq").value.replace(/[^\d.]/g,''))||0, amount_refunded:Number($("cAmtRef").value.replace(/[^\d.]/g,''))||0, responsible:$("cResp").value, comment:$("cComment").value,
+      client_name:$("cFio").value.trim(), purchase_date:$("cPurchase").value||null, package:$("cPackage").value.trim(), lessons_done:$("cLessons").value.trim(),
+      platform_activated:tv($("cActivated").value), meeting_held:tv($("cMeeting").value), dossier_notes:$("cDossier").value, dossier_ready:$("cReady").checked};
     await rfUpdate(id, patch, true);
     const newSt=$("cStatus").value;
     if(newSt!==c.status) await rfChangeStatus(id, newSt);
@@ -475,6 +507,33 @@ async function openCase(id){
     const { data } = await sb.storage.from("refund-docs").createSignedUrl(c.doc_path, 300);
     if(data&&data.signedUrl) window.open(data.signedUrl,"_blank");
   };
+  // сохранить введённые поля досье перед перерисовкой карточки
+  const persistDossier=async ()=>{ const tv=v=> v==="yes"?true : v==="no"?false : null;
+    await rfUpdate(id,{client_name:$("cFio").value.trim(), purchase_date:$("cPurchase").value||null, package:$("cPackage").value.trim(),
+      lessons_done:$("cLessons").value.trim(), platform_activated:tv($("cActivated").value), meeting_held:tv($("cMeeting").value),
+      dossier_notes:$("cDossier").value, dossier_ready:$("cReady").checked, responsible:$("cResp").value, comment:$("cComment").value},true);
+  };
+  $("rfModal").querySelectorAll(".rf-fup").forEach(inp=> inp.onchange=async (e)=>{
+    const kind=inp.dataset.kind, list=[...e.target.files]; if(!list.length) return;
+    $("cMsg").className="msg"; $("cMsg").textContent="Загрузка файлов…";
+    for(const f of list){
+      const path=id+"/"+kind+"/"+Date.now()+"_"+f.name.replace(/[^\w.\-]+/g,"_");
+      const { error }=await sb.storage.from("refund-docs").upload(path,f,{upsert:true});
+      if(error){ $("cMsg").innerHTML=`<span class="err">Ошибка: ${error.message}</span>`; return; }
+      await sb.from("refund_case_files").insert({case_id:id, kind, path, name:f.name, uploaded_by:(ME&&ME.email)||""});
+    }
+    await persistDossier(); openCase(id);
+  });
+  $("rfModal").querySelectorAll(".rf-fdl").forEach(a=> a.onclick=async (e)=>{ e.preventDefault();
+    const { data }=await sb.storage.from("refund-docs").createSignedUrl(a.dataset.path,300);
+    if(data&&data.signedUrl) window.open(data.signedUrl,"_blank");
+  });
+  $("rfModal").querySelectorAll(".rf-fdel").forEach(b=> b.onclick=async ()=>{
+    if(!confirm("Удалить файл?")) return;
+    await sb.storage.from("refund-docs").remove([b.dataset.path]);
+    await sb.from("refund_case_files").delete().eq("id",+b.dataset.fid);
+    await persistDossier(); openCase(id);
+  });
   if($("cResolve")) $("cResolve").onclick=async ()=>{
     $("cMsg").className="msg"; $("cMsg").textContent="Ищу сделку по номеру…";
     try{
