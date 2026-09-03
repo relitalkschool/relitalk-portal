@@ -310,20 +310,27 @@ const RF_STATUSES = [
   {k:"closed",          l:"Закрыто",               c:"var(--faint)"}
 ];
 const RF_LABEL = k => (RF_STATUSES.find(s=>s.k===k)||{l:k}).l;
-const RF_DEADLINE_DAYS = 15; // календарных дней на возврат после подписания соглашения
+const RF_DEADLINE_DAYS = 15; // дней на возврат после подписания соглашения
+const RF_RESPONSE_DAYS = 10; // дней на ответ по поданному заявлению
 let REFUNDS = [];
 let RF_VIEW = "board";
+// активный дедлайн зависит от статуса: 'submitted' → ответ (10 дн от создания), 'agreement_signed' → возврат (15 дн)
 function rfDeadline(c){
-  if(!c.deadline || c.status!=='agreement_signed') return null;
-  const days = Math.ceil((new Date(c.deadline) - new Date())/86400000);
-  return { days, overdue: days<0 };
+  let dl=null, kind=null;
+  if(c.status==='submitted' && c.created_at){ dl=new Date(new Date(c.created_at).getTime()+RF_RESPONSE_DAYS*86400000); kind='response'; }
+  else if(c.status==='agreement_signed' && c.deadline){ dl=new Date(c.deadline); kind='refund'; }
+  if(!dl) return null;
+  const days=Math.ceil((dl-new Date())/86400000);
+  return { days, overdue: days<0, kind, dl };
 }
 function rfDlText(c){
   const d=rfDeadline(c); if(!d) return "";
-  const dd = fmtDate(c.deadline).split(' ')[0];
-  if(d.overdue) return `<span style="display:inline-block;margin-top:5px;font-size:11.5px;font-weight:700;color:#fff;background:var(--crit);padding:2px 8px;border-radius:999px">🔴 просрочено ${Math.abs(d.days)} дн</span>`;
+  const p=n=>String(n).padStart(2,'0'); const dd=p(d.dl.getDate())+"."+p(d.dl.getMonth()+1);
+  const verb = d.kind==='response' ? "ответить" : "вернуть";
+  const icon = d.kind==='response' ? "✍️" : "⏳";
+  if(d.overdue) return `<span style="display:inline-block;margin-top:5px;font-size:11.5px;font-weight:700;color:#fff;background:var(--crit);padding:2px 8px;border-radius:999px">🔴 ${verb}: просрочено ${Math.abs(d.days)} дн</span>`;
   const col = d.days<=3 ? "var(--amber)" : "var(--good)";
-  return `<span style="display:inline-block;margin-top:5px;font-size:11.5px;font-weight:700;color:${col}">⏳ осталось ${d.days} дн · до ${dd}</span>`;
+  return `<span style="display:inline-block;margin-top:5px;font-size:11.5px;font-weight:700;color:${col}">${icon} ${verb}: осталось ${d.days} дн · до ${dd}</span>`;
 }
 function num(n){ return (Number(n)||0).toLocaleString("ru-RU"); }
 async function showRefunds(){
@@ -340,12 +347,14 @@ function renderRefunds(){
   // KPI по статусам
   const today=new Date(); today.setHours(0,0,0,0);
   const todayN = REFUNDS.filter(r=> new Date(r.created_at)>=today).length;
-  let sumReq=0, sumRef=0, hot=0, over=0; const cnt={};
+  let sumReq=0, sumRef=0, hotR=0, overR=0, hotF=0, overF=0; const cnt={};
   REFUNDS.forEach(r=>{ cnt[r.status]=(cnt[r.status]||0)+1; sumReq+=Number(r.amount_requested)||0; sumRef+=Number(r.amount_refunded)||0;
-    const d=rfDeadline(r); if(d){ if(d.overdue) over++; else if(d.days<=3) hot++; } });
+    const d=rfDeadline(r); if(d){ if(d.kind==='response'){ if(d.overdue) overR++; else if(d.days<=3) hotR++; } else { if(d.overdue) overF++; else if(d.days<=3) hotF++; } } });
+  const dlCol=(o,h)=> o?'var(--crit)':(h?'var(--amber)':'var(--good)');
   let kpi = `<div class="kpi"><div class="lab">Всего заявок</div><div class="val">${REFUNDS.length}</div><div class="foot">Новых сегодня: ${todayN}</div></div>`;
   kpi += `<div class="kpi"><div class="lab">Сумма к возврату</div><div class="val">${num(sumReq)}<small>₸</small></div><div class="foot">Выплачено: ${num(sumRef)} ₸</div></div>`;
-  kpi += `<div class="kpi"><div class="lab">Дедлайны возврата</div><div class="val" style="color:${over?'var(--crit)':(hot?'var(--amber)':'var(--good)')}">${over}<small> просроч.</small></div><div class="foot">Горящих (≤3 дн): ${hot}</div></div>`;
+  kpi += `<div class="kpi"><div class="lab">✍️ Ответ на заявление</div><div class="val" style="color:${dlCol(overR,hotR)}">${overR}<small> просроч.</small></div><div class="foot">Горящих (≤3 дн): ${hotR} · срок ${RF_RESPONSE_DAYS} дн</div></div>`;
+  kpi += `<div class="kpi"><div class="lab">⏳ Возврат после подписи</div><div class="val" style="color:${dlCol(overF,hotF)}">${overF}<small> просроч.</small></div><div class="foot">Горящих (≤3 дн): ${hotF} · срок ${RF_DEADLINE_DAYS} дн</div></div>`;
   const chips = RF_STATUSES.map(s=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;margin:2px 10px 2px 0"><i style="width:9px;height:9px;border-radius:3px;background:${s.c};display:inline-block"></i>${s.l}: <b>${cnt[s.k]||0}</b></span>`).join("");
   kpi += `<div class="kpi" style="grid-column:span 2"><div class="lab">По статусам</div><div style="margin-top:8px;line-height:1.9">${chips}</div></div>`;
   $("refKpis").innerHTML = kpi;
